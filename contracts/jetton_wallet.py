@@ -1,4 +1,4 @@
-from dbuilder import *
+from rift import *
 
 from .types import (
     OP,

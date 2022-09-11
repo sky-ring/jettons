@@ -1,4 +1,4 @@
-from dbuilder import *
+from rift import *
 
 from .jetton_wallet import JettonWallet
 from .types import (
