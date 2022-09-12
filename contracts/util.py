@@ -1,4 +1,4 @@
-from dbuilder import *
+from rift import *
 
 WORKCHAIN = 0
 
