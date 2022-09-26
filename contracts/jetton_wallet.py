@@ -26,68 +26,64 @@ class JettonWallet(Contract):
 
     data: Data
 
-    def internal_receive(
-        ctx,
-        balance: int,
-        msg_value: int,
-        in_msg_full: Cell,
-        in_msg_body: Slice,
-    ) -> None:
-        if in_msg_body.is_empty():
+    def internal_receive(self) -> None:
+        if self.body.is_empty():
             return
-        m = InternalMessage(in_msg_full.parse())
-        body = in_msg_body
-        if m.info.bounced:
-            ctx.on_bounce(body)
+        message = self.message
+        body = self.body
+        if message.info.bounced:
+            self.on_bounce(body)
             return
-        sender = m.info.src
-        fwd_fee = m.info.fwd_fee
+        sender = message.info.src
+        fwd_fee = message.info.fwd_fee
         op = body >> uint32
         if op == OP.Transfer:
-            ctx.send_tokens(body, sender, msg_value, fwd_fee)
+            self.send_tokens(body, sender, self.in_value, fwd_fee)
             return
         if op == OP.InternalTransfer:
-            ctx.receive_tokens(body, sender, balance, fwd_fee, msg_value)
+            self.receive_tokens(
+                body, sender, self.balance, fwd_fee, self.in_value
+            )
             return
         if op == OP.Burn:
-            ctx.burn_tokens(body, sender, msg_value, fwd_fee)
+            self.burn_tokens(body, sender, self.in_value, fwd_fee)
             return
         raise 0xFFFF
 
     @method()
-    def on_bounce(ctx, body: Slice):
+    def on_bounce(self, body: Slice):
         body.skip_n_(32)  # 0xFFFFFFFF
         op = body >> uint32
         assert (op == OP.BurnNotification) | (op == OP.InternalTransfer), 709
         body >> uint64
         amount = body >> Coin
-        ctx.data.balance += amount
-        ctx.data.save()
+        self.data.balance += amount
+        self.data.save()
 
     @method()
     def send_tokens(
-        ctx,
+        self,
         body: TransferBody,
         sender: MsgAddress,
         value: int,
         fwd_fee: int,
     ):
         Utils.force_chain(body.dest)
-        ctx.data.balance -= body.amount
-        assert sender.is_equal(ctx.data.owner), 705
-        assert ctx.data.balance >= 0, 706
+        self.data.balance -= body.amount
+        assert sender.is_equal(self.data.owner), 705
+        assert self.data.balance >= 0, 706
         c = ContractDeployer[JettonWallet](
             code="wallet_code",
-            owner=ctx.data.owner,
-            master=ctx.data.master,
+            owner=self.data.owner,
+            master=self.data.master,
             balance=0,
-            wallet_code=ctx.data.wallet_code,
+            wallet_code=self.data.wallet_code,
         )
         msg_body = InternalTransferBody(
             op=OP.InternalTransfer,
             query_id=body.query_id,
             amount=body.amount,
-            from_=ctx.data.owner,
+            from_=self.data.owner,
             response_addr=body.response_dest,
             forward_ton=body.forward_ton,
             forward_payload=body.__data__,
@@ -107,25 +103,25 @@ class JettonWallet(Contract):
             + (2 * GAS_CONSUMPTION + MIN_STORAGE_TONS)
         ), 709
         msg.send(MessageMode.CARRY_REM_VALUE)
-        ctx.data.save()
+        self.data.save()
 
     @method()
     def receive_tokens(
-        ctx,
+        self,
         body: InternalTransferBody,
         sender: MsgAddress,
         ton_balance: int,
         fwd_fee: int,
         value: int,
     ):
-        ctx.data.balance += body.amount
-        is_master = ctx.data.master.is_equal(sender)
+        self.data.balance += body.amount
+        is_master = self.data.master.is_equal(sender)
         child_valid_addr = ContractDeployer[JettonWallet](
             code="wallet_code",
-            owner=ctx.data.owner,
-            master=ctx.data.master,
+            owner=self.data.owner,
+            master=self.data.master,
             balance=0,
-            wallet_code=ctx.data.wallet_code,
+            wallet_code=self.data.wallet_code,
         ).address
         is_child_wallet = sender.is_equal(child_valid_addr)
         assert is_master | is_child_wallet, 707
@@ -143,7 +139,7 @@ class JettonWallet(Contract):
                 payload=body.rest(),
             )
             msg = InternalMessage[TransferNotification].build(
-                dest=ctx.data.owner,
+                dest=self.data.owner,
                 amount=fwd_amount,
                 body=notification.as_ref(),
                 bounce=0,
@@ -161,32 +157,32 @@ class JettonWallet(Contract):
                 bounce=0,
             )
             msg.send(MessageMode.ORDINARY, MessageFlag.FLAG_IGNORE_ACTION_ERR)
-        ctx.data.save()
+        self.data.save()
 
     @method()
     def burn_tokens(
-        ctx,
+        self,
         body: BurnBody,
         sender: MsgAddress,
         value: int,
         fwd_fee: int,
     ):
         query_id = body.query_id
-        ctx.data.balance -= body.amount
-        assert ctx.data.owner.is_equal(sender), 705
-        assert ctx.data.balance >= 0, 706
+        self.data.balance -= body.amount
+        assert self.data.owner.is_equal(sender), 705
+        assert self.data.balance >= 0, 706
         assert value > fwd_fee + 2 * GAS_CONSUMPTION, 707
 
         mb = BurnNotification(
             op=OP.BurnNotification,
             query_id=query_id,
             amount=body.amount,
-            owner=ctx.data.owner,
+            owner=self.data.owner,
             response=body.response_dest,
         )
         msg = InternalMessage[BurnNotification].build(
-            dest=ctx.data.master,
+            dest=self.data.master,
             body=mb.as_ref(),
         )
         msg.send(MessageMode.CARRY_REM_VALUE)
-        ctx.data.save()
+        self.data.save()
