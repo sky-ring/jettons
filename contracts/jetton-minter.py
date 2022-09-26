@@ -22,34 +22,25 @@ class JettonMinter(Contract):
 
     data: Data
 
-    def internal_receive(
-        ctx,
-        balance: int,
-        msg_value: int,
-        in_msg_full: Cell,
-        in_msg_body: Slice,
-    ) -> None:
-        # what we'd look like to see
-        if in_msg_body.is_empty():
+    def internal_receive(self) -> None:
+        if self.body.is_empty():
             return
-        m = InternalMessage(in_msg_full.parse())
-        body = in_msg_body
-        if m.info.bounced:
+        if self.message.info.bounced:
             # ignore bounced
             return
-        sender = m.info.src
-        op = body >> uint32
+        sender = self.message.info.src
+        op = self.body >> uint32
         if op == MinterOP.MINT:
-            assert sender.is_equal(ctx.data.admin), 73
-            b = MintBody(body)
+            assert sender.is_equal(self.data.admin), 73
+            b = self.body % MintBody
             cd = ContractDeployer[JettonWallet](
                 code="wallet_code",
                 owner=b.to,
                 master=std.my_address(),
                 balance=0,
-                wallet_code=ctx.data.wallet_code,
+                wallet_code=self.data.wallet_code,
             )
-            ctx.data.total_supply += b.master_msg.body.amount
+            self.data.total_supply += b.master_msg.body.amount
             msg = InternalMessage[InternalTransferBody].build(
                 dest=cd.address,
                 amount=0,
@@ -57,19 +48,19 @@ class JettonMinter(Contract):
                 body=b.master_msg.origin_slice(),
             )
             msg.send(MessageMode.ORDINARY, MessageFlag.FLAG_SEPERATE_FEE)
-            ctx.data.save()
+            self.data.save()
             return
         if op == OP.BurnNotification:
-            b = BurnNotification(body)
+            b = self.body % BurnNotification
             c = ContractDeployer[JettonWallet](
                 code="wallet_code",
                 owner=b.owner,
                 master=std.my_address(),
                 balance=0,
-                wallet_code=ctx.data.wallet_code,
+                wallet_code=self.data.wallet_code,
             )
             assert c.address.is_equal(sender), 74
-            ctx.data.total_supply -= b.amount
+            self.data.total_supply -= b.amount
             resp_addr = b.response
             if resp_addr.int(2) != 0:
                 notification = Excess(
@@ -88,14 +79,14 @@ class JettonMinter(Contract):
                 )
             return
         if op == MinterOP.CHANGE_ADMIN:
-            assert sender.is_equal(ctx.data.admin), 73
-            ctx.data.admin = body >> MsgAddress
-            ctx.data.save()
+            assert sender.is_equal(self.data.admin), 73
+            self.data.admin = self.body >> MsgAddress
+            self.data.save()
             return
         if op == MinterOP.CHANGE_CONTENT:
-            assert sender.is_equal(ctx.data.admin), 73
-            ctx.data.content = body >> Ref[Cell]
-            ctx.data.save()
+            assert sender.is_equal(self.data.admin), 73
+            self.data.content = self.body >> Ref[Cell]
+            self.data.save()
             return
 
         raise 0xFFFF
