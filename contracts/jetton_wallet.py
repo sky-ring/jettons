@@ -42,7 +42,11 @@ class JettonWallet(Contract):
             return
         if op == OP.InternalTransfer:
             self.receive_tokens(
-                body, sender, self.balance, fwd_fee, self.in_value
+                body,
+                sender,
+                self.balance,
+                fwd_fee,
+                self.in_value,
             )
             return
         if op == OP.Burn:

@@ -23,7 +23,7 @@ class TransferBody(Payload):
     response_dest: MsgAddress
     custom_payload: Maybe[Ref[Cell]]
     forward_ton: Coin
-    forward_payload: Either[Cell, Ref[Cell]]
+    forward_payload: EitherRef[Cell]
 
 
 class InternalTransferBody(Payload):
@@ -32,7 +32,7 @@ class InternalTransferBody(Payload):
     from_: MsgAddress
     response_addr: MsgAddress
     forward_ton: Coin
-    forward_payload: Either[Cell, Ref[Cell]]
+    forward_payload: EitherRef[Cell]
 
 
 class BurnBody(Payload):
@@ -55,7 +55,7 @@ class TransferNotification(Payload):
     query_id: uint64
     amount: Coin
     from_: MsgAddress
-    payload: Either[Cell, Ref[Cell]]
+    payload: EitherRef[Cell]
 
 
 class Excess(Payload):

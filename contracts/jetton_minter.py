@@ -62,7 +62,7 @@ class JettonMinter(Contract):
             assert c.address.is_equal(sender), 74
             self.data.total_supply -= b.amount
             resp_addr = b.response
-            if resp_addr.int(2) != 0:
+            if resp_addr.sint(2) != 0:
                 notification = Excess(
                     op=OP.Excesses,
                     query_id=b.query_id,

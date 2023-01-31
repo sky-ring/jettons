@@ -1,3 +1,18 @@
 # rift project configuration file
 
 name = "jetton-db"
+
+[contracts.jetton-wallet]
+    name = "jetton_wallet"
+    contract = "JettonWallet"
+    tests = [
+        "test_wallet"
+    ]
+
+
+[contracts.jetton-minter]
+    contract = "JettonMinter"
+    tests = [
+        "test_minter"
+    ]
+    deploy = "deploy_minter"
